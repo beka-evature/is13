@@ -32,7 +32,7 @@ def atisfold(fold):
     f = load(PREFIX + 'atis.fold'+str(fold)+'.pkl.gz')
     train_set, valid_set, test_set, dicts = cPickle.load(f)
     return train_set, valid_set, test_set, dicts
- 
+
 if __name__ == '__main__':
     
     ''' visualize a few sentences '''

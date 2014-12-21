@@ -37,7 +37,7 @@ def contextwin(l, win):
     assert win >=1
     l = list(l)
 
-    lpadded = win/2 * [-1] + l + win/2 * [-1]
+    lpadded = win//2 * [-1] + l + win//2 * [-1]
     out = [ lpadded[i:i+win] for i in range(len(l)) ]
 
     assert len(out) == len(l)

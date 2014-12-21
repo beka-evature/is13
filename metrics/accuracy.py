@@ -1,13 +1,11 @@
 import numpy
-import pdb
-import cPickle
 import random
 import os
 import stat
 import subprocess
-from os.path import isfile, join
+from os.path import isfile
 from os import chmod
-from is13.data.load import download
+from data.load import download
 
 PREFIX = os.getenv('ATISDATA', '')
 
