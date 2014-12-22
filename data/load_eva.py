@@ -104,7 +104,7 @@ def prepare_data():
     conf = {'fold': 3, # 5 folds 0,1,2,3,4
             'lr': 0.0627142536696559,
             'verbose': False,
-            'decay': False, # decay on the learning rate if improvement stops
+            'decay': True, # decay on the learning rate if improvement stops
             'win': 7, # number of words in the context window
             'bs': 9, # number of backprop through time steps
             'nhidden': 100, # number of hidden units
@@ -113,7 +113,11 @@ def prepare_data():
             'nepochs': 50}
 
     _session_files = [join(SESSION_PATH, f) for f in listdir(SESSION_PATH) if f.endswith("json")]
-    session_files = [f for f in _session_files if isfile(f)][:4000] # To speed things up...
+
+    session_files = [f for f in _session_files if isfile(f)]
+    random.seed(conf['seed'])
+    random.shuffle(session_files)
+    session_files = session_files[:20000] # Limit the span To speed things up...
     sentences = []
     idxes = []
     labels = []
@@ -142,14 +146,9 @@ def prepare_data():
     idx2label = dict((k, v) for v, k in LABELS2IDX.iteritems())
     idx2word = dict((k, v) for v, k in words2idx.iteritems())
 
+    vocsize = len(idx2word)
 
-    vocsize = len(set(reduce(\
-                       lambda x, y: list(x) + list(y), \
-                       train_lex + valid_lex + test_lex)))
-
-    nclasses = len(set(reduce(\
-                       lambda x, y: list(x) + list(y), \
-                       train_y + test_y + valid_y)))
+    nclasses = len(set(reduce(lambda x, y: list(x) + list(y), train_y + test_y + valid_y)))
 
     nsentences = len(train_lex)
     folder = os.path.basename(__file__).split('.')[0]
@@ -159,14 +158,15 @@ def prepare_data():
     np.random.seed(conf['seed'])
     random.seed(conf['seed'])
     rnn = model(nh = conf['nhidden'],
-                    nc = nclasses,
-                    ne = vocsize,
-                    de = conf['emb_dimension'],
-                    cs = conf['win'])
+                nc = nclasses,
+                ne = vocsize,
+                de = conf['emb_dimension'],
+                cs = conf['win'])
 
     # train with early stopping on validation set
     best_f1 = -np.inf
     conf['clr'] = conf['lr']
+    print "Start training"
     for e in xrange(conf['nepochs']):
         # shuffle
         shuffle([train_lex, train_y], conf['seed'])
@@ -174,8 +174,7 @@ def prepare_data():
         tic = time.time()
         for i in xrange(nsentences):
             cwords = contextwin(train_lex[i], conf['win'])
-            words = map(lambda x: np.asarray(x).astype('int32'), \
-                         minibatch(cwords, conf['bs']))
+            words = [np.asarray(x).astype(np.int32) for x in minibatch(cwords, conf['bs'])]
             labels = train_y[i]
             for word_batch , label_last_word in zip(words, labels):
                 rnn.train(word_batch, label_last_word, conf['clr'])
@@ -185,17 +184,9 @@ def prepare_data():
                 sys.stdout.flush()
 
         # evaluation // back into the real world : idx -> words
-        try:
-            predictions_test = [ map(lambda x: idx2label[x], \
-                             rnn.classify(np.asarray(contextwin(x, conf['win'])).astype('int32')))\
-                             for x in test_lex ]
-        except:
-            print x
-            print repr(x)
-            print contextwin(x, conf['win'])
-            print repr(contextwin(x, conf['win']))
-            print np.asarray(contextwin(x, conf['win']))
-            print np.asarray(contextwin(x, conf['win'])).astype('int32')
+        predictions_test = [ map(lambda x: idx2label[x], \
+                         rnn.classify(np.asarray(contextwin(x, conf['win'])).astype('int32')))\
+                         for x in test_lex ]
         groundtruth_test = [ map(lambda x: idx2label[x], y) for y in test_y ]
         words_test = [ map(lambda x: idx2word[x], w) for w in test_lex]
 

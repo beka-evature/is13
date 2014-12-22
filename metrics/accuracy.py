@@ -29,8 +29,8 @@ def conlleval(p, g, w, filename):
             out += w + ' ' + wl + ' ' + wp + '\n'
         out += 'EOS O O\n\n'
 
-    f = open(filename,'w')
-    f.writelines(out)
+    f = open(filename, 'w')
+    f.write(out.encode("utf-8"))
     f.close()
     
     return get_perf(filename)
