@@ -16,14 +16,10 @@ class model(object):
         cs :: word window context size 
         '''
         # parameters of the model
-        self.emb = theano.shared(0.2 * numpy.random.uniform(-1.0, 1.0,\
-                   (ne+1, de)).astype(theano.config.floatX)) # add one for PADDING at the end
-        self.Wx  = theano.shared(0.2 * numpy.random.uniform(-1.0, 1.0,\
-                   (de * cs, nh)).astype(theano.config.floatX))
-        self.Wh  = theano.shared(0.2 * numpy.random.uniform(-1.0, 1.0,\
-                   (nh, nh)).astype(theano.config.floatX))
-        self.W   = theano.shared(0.2 * numpy.random.uniform(-1.0, 1.0,\
-                   (nh, nc)).astype(theano.config.floatX))
+        self.emb = theano.shared(0.2 * numpy.random.uniform(-1.0, 1.0, (ne+1, de)).astype(theano.config.floatX)) # add one for PADDING at the end
+        self.Wx  = theano.shared(0.2 * numpy.random.uniform(-1.0, 1.0, (de * cs, nh)).astype(theano.config.floatX))
+        self.Wh  = theano.shared(0.2 * numpy.random.uniform(-1.0, 1.0, (nh, nh)).astype(theano.config.floatX))
+        self.W   = theano.shared(0.2 * numpy.random.uniform(-1.0, 1.0, (nh, nc)).astype(theano.config.floatX))
         self.bh  = theano.shared(numpy.zeros(nh, dtype=theano.config.floatX))
         self.b   = theano.shared(numpy.zeros(nc, dtype=theano.config.floatX))
         self.h0  = theano.shared(numpy.zeros(nh, dtype=theano.config.floatX))
@@ -40,9 +36,7 @@ class model(object):
             s_t = T.nnet.softmax(T.dot(h_t, self.W) + self.b)
             return [h_t, s_t]
 
-        [h, s], _ = theano.scan(fn=recurrence, \
-            sequences=x, outputs_info=[self.h0, None], \
-            n_steps=x.shape[0])
+        [h, s], _ = theano.scan(fn=recurrence, sequences=x, outputs_info=[self.h0, None], n_steps=x.shape[0])
 
         p_y_given_x_lastword = s[-1,0,:]
         p_y_given_x_sentence = s[:,0,:]
@@ -57,12 +51,9 @@ class model(object):
         # theano functions
         self.classify = theano.function(inputs=[idxs], outputs=y_pred)
 
-        self.train = theano.function( inputs  = [idxs, y, lr],
-                                      outputs = nll,
-                                      updates = updates )
+        self.train = theano.function(inputs  = [idxs, y, lr], outputs = nll, updates = updates )
 
-        self.normalize = theano.function( inputs = [],
-                         updates = {self.emb:\
+        self.normalize = theano.function( inputs = [], updates = {self.emb:
                          self.emb/T.sqrt((self.emb**2).sum(axis=1)).dimshuffle(0,'x')})
 
     def save(self, folder):   
