@@ -26,6 +26,12 @@ def conlleval(p, g, w, filename):
     for sl, sp, sw in zip(g, p, w):
         out += 'BOS O O\n'
         for wl, wp, w in zip(sl, sp, sw):
+            if len(w) == 1:
+                w += w
+            if len(wl) == 1:
+                wl += "-" + wl
+            if len(wp) == 1:
+                wp += "-" + wp
             out += w + ' ' + wl + ' ' + wp + '\n'
         out += 'EOS O O\n\n'
 
@@ -46,6 +52,9 @@ def get_perf(filename):
 
     proc = subprocess.Popen(["perl", _conlleval], stdin=subprocess.PIPE, stdout=subprocess.PIPE)
     stdout, _ = proc.communicate('\n'.join(open(filename).readlines()))
+#     print "X" * 100
+#     print stdout
+#     print "X" * 100
     for line in stdout.split('\n'):
         if 'accuracy' in line:
             out = line.split()

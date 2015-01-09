@@ -27,6 +27,10 @@ from rnn.elman2vec import model as elman2vec
 from rnn.elman import model as regular_elman
 import theano
 from gensim.models.word2vec import Word2Vec
+from core.infra.play_sound import beep_please
+import atexit
+atexit.register(beep_please)
+
 
 WORD2VEC_FILENAME = "/home/tal/Downloads/GoogleNews-vectors-negative300.bin"
 DTP = get_time_parser()
@@ -265,17 +269,18 @@ def play_with_splitting_sentences():
         'lr': 0.0627142536696559,
         'verbose': False,
         'decay': True, # decay on the learning rate if improvement stops
-        'win': 13, # number of characters in the context window
-        'bs': 4, # number of back-propagation through time steps
-        'nhidden': 10, # number of hidden units
+        'win': 15, # number of characters in the context window
+        'bs': 5, # number of back-propagation through time steps
+        'nhidden': 40, # number of hidden units
         'seed': 345,
-        'emb_dimension': 2, # dimension of character embedding
-        'nepochs': 50}
+        'emb_dimension': 30, # dimension of character embedding
+        'nepochs': 10}
+    number_of_files = 40000
     np.random.seed(conf['seed'])
     random.seed(conf['seed'])
     print "Calculate output"
-    session_files = get_session_files(number_of_files=1000, random_seed=conf['seed']) # Limit the scope To speed things up...
-    labels2idx = {"_": 0, "X": 1}
+    session_files = get_session_files(number_of_files=number_of_files, random_seed=conf['seed']) # Limit the scope To speed things up...
+    labels2idx = {"O": 0, "X": 1}
     sentences = []
     idxes = []
     labels_idxes = []
@@ -295,17 +300,17 @@ def play_with_splitting_sentences():
     print "Prepare train, validation and test sets"
     train_valid_lex, test_lex, train_valid_y, test_y = train_test_split(idxes, labels_idxes, test_size=0.15, random_state=42)
     train_lex, valid_lex, train_y, valid_y = train_test_split(train_valid_lex, train_valid_y, test_size=0.2, random_state=42)
-
+    print "Some more prep"
     idx2label = dict((k, v) for v, k in labels2idx.iteritems()) # Reverse the dictionary
     idx2word = dict((k, v) for v, k in char2idx.iteritems()) # Reverse the dictionary
 
-    vocsize = len(set(reduce(\
-                       lambda x, y: list(x)+list(y),\
-                       train_lex+valid_lex+test_lex)))
-
-    nclasses = len(set(reduce(lambda x, y: list(x) + list(y), train_y + test_y + valid_y)))
-
+#     vocsize = 1 + len(set(reduce(\
+#                                  lambda x, y: list(x)+list(y),\
+#                                  train_lex+valid_lex+test_lex)))
+    vocsize = 1 + len(set(item for lex in (train_lex, valid_lex, test_lex) for sublist in lex for item in sublist))
+    nclasses = 2  #len(set(reduce(lambda x, y: list(x) + list(y), train_y + test_y + valid_y)))
     nsentences = len(train_lex)
+    print "Some file os calls"
     folder = os.path.basename(__file__).split('.')[0] + "_2"
     if not os.path.exists(folder):
         os.mkdir(folder)
@@ -320,6 +325,7 @@ def play_with_splitting_sentences():
     best_f1 = -np.inf
     conf['clr'] = conf['lr']
     print "Start training"
+    start_time = time.time()
     for epoch in xrange(conf['nepochs']):
         # shuffle
         shuffle([train_lex, train_y], conf['seed'])
@@ -371,24 +377,24 @@ def play_with_splitting_sentences():
         if conf['clr'] < 1e-5:
             break
 
-    print 'BEST RESULT: epoch', epoch, 'valid F1', res_valid['f1'], 'best test F1', res_test['f1'], 'with the model', folder
-
+    print 'BEST RESULT: epoch', conf['be'], 'valid F1', best_f1, 'best test F1', conf['tf1'], 'with the model', folder
+    print "total time = {} seconds".format(time.time() - start_time)
 
 def create_test(sentence, probability):
     """Concatenate some words"""
     words = sentence.split()
     if words:
-        output, labels = words[0], "_" * len(words[0])
+        output, labels = words[0], "X" + "O" * (len(words[0]) - 1)
         for word in words[1:]:
             if random.random() > probability:
-                output += "_" + word
-                labels += "_" * (len(word) + 1)
-            else:
-                output += word
-                labels += "X" + "_" * (len(word) - 1)
+                output += "_" # Replace space with underline
+                labels += "O"
+            labels += "X" + "O" * (len(word) - 1)
+            output += word
     else:
         output = labels = ""
     return output, labels
+
 
 if __name__ == '__main__':
 #     prepare_data()
