@@ -26,10 +26,16 @@ def conlleval(p, g, w, filename):
     for sl, sp, sw in zip(g, p, w):
         out += 'BOS O O\n'
         for wl, wp, w in zip(sl, sp, sw):
-            if len(w) == 1:
-                w += w
+#             if len(w) == 1:
+#                 w += w
+            if w == " ":
+                w = "_"
+            if wl == " ":
+                wl = "_"    
             if len(wl) == 1:
                 wl += "-" + wl
+            if wp == " ":
+                wp = "_"
             if len(wp) == 1:
                 wp += "-" + wp
             out += w + ' ' + wl + ' ' + wp + '\n'
