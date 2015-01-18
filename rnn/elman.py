@@ -59,3 +59,7 @@ class model(object):
     def save(self, folder):   
         for param, name in zip(self.params, self.names):
             numpy.save(os.path.join(folder, name + '.npy'), param.get_value())
+
+    def load(self, folder):   
+        for param, name in zip(self.params, self.names):
+            param.set_value(numpy.load(os.path.join(folder, name + '.npy')))

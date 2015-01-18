@@ -35,20 +35,6 @@ def session_to_text0(session):
     utterance = session["utterances"][0]
     return utterance["text"]
 
-# def get_words2idx(session_files):
-#     """Get the indexes of words"""
-#     tokens = Counter()
-#     for session_file in session_files:
-#         session = json.loads(open(session_file, "rb").read())
-#         sentence = session_to_text0(session)
-#         token_list = tokenize(sentence)
-#         for token in token_list:
-#             tokens[token.lower()] += 1
-#             tokens[re.sub(r"\d", "DIGIT", token.lower())] += 1
-#     tokens_clean = dict((k, v) for k, v in tokens.iteritems()) # if v > 1) - words that happen only once -> unknown
-#     words2idx = dict((k, i) for i, (k, v) in enumerate(tokens_clean.iteritems()))
-#     words2idx["<UNK>"] = max(index for index in words2idx.itervalues()) + 1
-#     return words2idx
 
 def get_char_to_idx(session_files):
     """Get an index for each char in the input"""
@@ -72,23 +58,22 @@ def get_session_files(number_of_files=None, random_seed=None):
 def play_with_spelling():
     """Play with spelling mistakes"""
     conf = {
-        'lr': 0.0627142536696559,
-        'verbose': False,
+        'lr': 0.1, # 0.0627142536696559,
+        'verbose': True,
         'decay': True, # decay on the learning rate if improvement stops
         'win': 15, # number of characters in the context window
         'bs': 5, # number of back-propagation through time steps
-        'nhidden': 100, # number of hidden units
+        'nhidden': 200, # number of hidden units
         'seed': 345,
-        'emb_dimension': 50, # dimension of character embedding
-        'nepochs': 10}
-    number_of_files = 50000
+        'emb_dimension': 10, # dimension of character embedding
+        'nepochs': 1000}
+    number_of_files = 900
     print conf
     print "number_of_files=", number_of_files
     np.random.seed(conf['seed'])
     random.seed(conf['seed'])
     print "Calculate output"
     session_files = get_session_files(number_of_files=number_of_files, random_seed=conf['seed']) # Limit the scope To speed things up...
-#     labels2idx = {"O": 0, "X": 1}
     sentences = []
     idxes = []
     labels_idxes = []
@@ -108,9 +93,17 @@ def play_with_spelling():
     print "Prepare train, validation and test sets"
     train_valid_lex, test_lex, train_valid_y, test_y = train_test_split(idxes, labels_idxes, test_size=0.15, random_state=42)
     train_lex, valid_lex, train_y, valid_y = train_test_split(train_valid_lex, train_valid_y, test_size=0.2, random_state=42)
+
     print "Some more prep"
     idx2label = dict((k, v) for v, k in labels2idx.iteritems()) # Reverse the dictionary
     idx2word = dict((k, v) for v, k in char2idx.iteritems()) # Reverse the dictionary
+    groundtruth_test = [map(lambda x: idx2label[x], y) for y in test_y]
+    windowed_test_lex = [np.asarray(contextwin(x, conf['win'])).astype('int32') for x in test_lex]
+    windowed_valid_lex = [np.asarray(contextwin(x, conf['win'])).astype('int32') for x in valid_lex]
+                             
+    words_test = [ map(lambda x: idx2word[x], w) for w in test_lex]
+    groundtruth_valid = [ map(lambda x: idx2label[x], y) for y in valid_y ]
+    words_valid = [ map(lambda x: idx2word[x], w) for w in valid_lex]
 
 #     vocsize = 1 + len(set(reduce(\
 #                                  lambda x, y: list(x)+list(y),\
@@ -119,7 +112,7 @@ def play_with_spelling():
     nclasses = 1 + len(set(item for _y in (train_y, test_y, valid_y) for sublist in _y for item in sublist))
     nsentences = len(train_lex)
     print "Some file os calls"
-    folder = os.path.basename(__file__).split('.')[0] + "_1"
+    folder = os.path.basename(__file__).split('.')[0] + "_3"
     if not os.path.exists(folder):
         os.mkdir(folder)
     print "Create a Neural Network"
@@ -139,6 +132,7 @@ def play_with_spelling():
         shuffle([train_lex, train_y], conf['seed'])
         conf['ce'] = epoch
         tic = time.time()
+        print "tic"
         for i in xrange(nsentences):
             cwords = contextwin(train_lex[i], conf['win'])
             words = [np.asarray(x).astype(np.int32) for x in minibatch(cwords, conf['bs'])]
@@ -151,19 +145,26 @@ def play_with_spelling():
                 sys.stdout.flush()
 
         # evaluation // back into the real world : idx -> words
-        predictions_test = [ map(lambda x: idx2label[x], \
-                         rnn.classify(np.asarray(contextwin(x, conf['win'])).astype('int32')))\
-                         for x in test_lex ]
-        groundtruth_test = [ map(lambda x: idx2label[x], y) for y in test_y ]
-        words_test = [ map(lambda x: idx2word[x], w) for w in test_lex]
+        if conf['verbose']:
+            print "Classify test"
+#         predictions_test = [ map(lambda x: idx2label[x], \
+#                          rnn.classify(np.asarray(contextwin(x, conf['win'])).astype('int32')))\
+#                          for x in test_lex ]
+        predictions_test = [[idx2label[x] for x in rnn.classify(windowed_test_lex_item)]
+                            for windowed_test_lex_item in windowed_test_lex]
 
-        predictions_valid = [ map(lambda x: idx2label[x], \
-                             rnn.classify(np.asarray(contextwin(x, conf['win'])).astype('int32')))\
-                             for x in valid_lex ]
-        groundtruth_valid = [ map(lambda x: idx2label[x], y) for y in valid_y ]
-        words_valid = [ map(lambda x: idx2word[x], w) for w in valid_lex]
+        if conf['verbose']:
+            print "Classify validation"
+#         predictions_valid = [ map(lambda x: idx2label[x], \
+#                              rnn.classify(np.asarray(contextwin(x, conf['win'])).astype('int32')))\
+#                              for x in valid_lex ]
+        predictions_valid = [[idx2label[x] for x in rnn.classify(windowed_valid_lex_item)]
+                             for windowed_valid_lex_item in windowed_valid_lex]
+
 
         # evaluation // compute the accuracy using conlleval.pl
+        if conf['verbose']:
+            print "Evaluate test and validation"
         res_test = conlleval(predictions_test, groundtruth_test, words_test, folder + '/current.test.txt')
         res_valid = conlleval(predictions_valid, groundtruth_valid, words_valid, folder + '/current.valid.txt')
 
@@ -178,6 +179,7 @@ def play_with_spelling():
             subprocess.call(['mv', folder + '/current.valid.txt', folder + '/best.valid.txt'])
         else:
             print '        : epoch', epoch, 'valid F1', res_valid['f1'], '     test F1', res_test['f1'], ' ' * 20
+            rnn.load(folder)
 
         # learning rate decay if no improvement in 10 epochs
         if conf['decay'] and abs(conf['be'] - conf['ce']) >= 10:
