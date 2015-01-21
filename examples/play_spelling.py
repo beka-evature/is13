@@ -23,7 +23,6 @@ atexit.register(beep_please)
 
 
 SESSION_PATH = "/home/tal/workspace/sessions"
-# LABELS2IDX = {"O":0, "B-when": 1, "I-when": 2, "B-duration": 3, "I-duration": 4}
 
 
 def session_to_text0(session):
@@ -198,8 +197,8 @@ def create_tests(sentences, error_probability, labels2idx, char2idx):
     idxes = []
     labels_idxes = []
     for sentence in sentences:
-        sentence_out, label = create_test(sentence, probability=error_probability)
-        labels_idxes.append(np.fromiter((labels2idx[l] for l in label), dtype=np.uint32))
+        sentence_out = create_test(sentence, probability=error_probability)
+        labels_idxes.append(np.fromiter((labels2idx[l] for l in sentence), dtype=np.uint32))
         idxes.append(np.fromiter((char2idx[char] for char in sentence_out), dtype=np.uint32))
     return idxes, labels_idxes
 
@@ -215,7 +214,7 @@ def create_test(sentence, probability):
             if char.isupper():
                 err_char = err_char.upper()
             w_errors += err_char
-    return w_errors, sentence
+    return w_errors
 
 
 if __name__ == '__main__':
