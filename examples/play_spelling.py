@@ -80,15 +80,17 @@ def play_with_spelling():
 
     print "Prepare train, validation and test sets"
     train_valid_sentences, test_sentences = train_test_split(sentences, test_size=0.15, random_state=CONF['seed'])
+    train_sentences, valid_sentences = train_test_split(train_valid_sentences, test_size=0.2, random_state=CONF['seed'])
     print len(train_valid_sentences), len(test_sentences)
     test_lex, test_y = create_tests(test_sentences, CONF['error_probability'], labels2idx, char2idx)
-    train_valid_idxes = []
-    train_valid_labels_idxes = []
+    valid_lex, valid_y = create_tests(valid_sentences, CONF['error_probability'], labels2idx, char2idx)
+    train_lex = []
+    train_y = []
     for error_probability in (CONF['error_probability'], CONF['error_probability'] / 10, CONF['error_probability'] / 100, 0):
-        _train_valid_idxes, _train_valid_labels_idxes = create_tests(train_valid_sentences, error_probability, labels2idx, char2idx)
-        train_valid_idxes.extend(_train_valid_idxes)
-        train_valid_labels_idxes.extend(_train_valid_labels_idxes)
-    train_lex, valid_lex, train_y, valid_y = train_test_split(train_valid_idxes, train_valid_labels_idxes, test_size=0.2, random_state=CONF['seed'])
+        _train_idxes, _train_labels_idxes = create_tests(train_sentences, error_probability, labels2idx, char2idx)
+        train_lex.extend(_train_idxes)
+        train_y.extend(_train_labels_idxes)
+#     train_lex, valid_lex, train_y, valid_y = train_test_split(train_valid_idxes, train_valid_labels_idxes, test_size=0.2, random_state=CONF['seed'])
     print len(train_lex), len(valid_lex), len(train_y), len(valid_y)
 
     print "Some more prep"
@@ -132,31 +134,35 @@ def play_with_spelling():
         shuffle([words_lex, train_y], CONF['seed'])
         CONF['ce'] = epoch
         tic = time.time()
-        print "tic"
-        for i in xrange(nsentences):
+        percentage_of_sentences_to_train = (epoch + 1) / CONF['nepochs']
+        numer_of_sentences_to_train = int(nsentences * percentage_of_sentences_to_train)
+        print "starting an epoch, numer_of_sentences_to_train =", numer_of_sentences_to_train
+        for i in xrange(numer_of_sentences_to_train):
             words = words_lex[i]
             labels = train_y[i]
             for word_batch, label_last_word in zip(words, labels):
                 rnn.train(word_batch, label_last_word, CONF['current_learning_rate'])
                 rnn.normalize()
             if CONF['verbose']:
-                print '[learning] epoch %i >> %2.2f%%' % (epoch, (i + 1) * 100. / nsentences), 'completed in %.2f (sec) <<\r' % (time.time() - tic),
+                print '[learning] epoch %i >> %2.2f%%' % (epoch, (i + 1) * 100. / numer_of_sentences_to_train), 'completed in %.2f (sec) <<\r' % (time.time() - tic),
 
         # evaluation // back into the real world : idx -> words
         if CONF['verbose']:
             print "Classify test"
+        test_size = int(len(windowed_test_lex) * percentage_of_sentences_to_train)
         predictions_test = [[idx2label[x] for x in rnn.classify(windowed_test_lex_item)]
-                            for windowed_test_lex_item in windowed_test_lex]
+                            for windowed_test_lex_item in windowed_test_lex[:test_size]]
 
         if CONF['verbose']:
             print "Classify validation"
+        validation_size = int(len(windowed_valid_lex) * percentage_of_sentences_to_train)
         predictions_valid = [[idx2label[x] for x in rnn.classify(windowed_valid_lex_item)]
-                             for windowed_valid_lex_item in windowed_valid_lex]
+                             for windowed_valid_lex_item in windowed_valid_lex[:validation_size]]
         # evaluation // compute the accuracy using conlleval.pl
         if CONF['verbose']:
             print "Evaluate test and validation"
-        res_test = conlleval(predictions_test, groundtruth_test, words_test, folder + '/current.test.txt')
-        res_valid = conlleval(predictions_valid, groundtruth_valid, words_valid, folder + '/current.valid.txt')
+        res_test = conlleval(predictions_test, groundtruth_test[:test_size], words_test[:test_size], folder + '/current.test.txt')
+        res_valid = conlleval(predictions_valid, groundtruth_valid[:validation_size], words_valid[:validation_size], folder + '/current.valid.txt')
 
         if res_valid['f1'] > best_f1:
             rnn.save(folder)
