@@ -78,9 +78,9 @@ def play_with_spelling():
     print len(sentences)
     labels2idx = char2idx = get_char_to_idx(sentences)
 
+    print "Prepare train, validation and test sets"
     train_valid_sentences, test_sentences = train_test_split(sentences, test_size=0.15, random_state=CONF['seed'])
     print len(train_valid_sentences), len(test_sentences)
-    print "Prepare train, validation and test sets"
     test_lex, test_y = create_tests(test_sentences, CONF['error_probability'], labels2idx, char2idx)
     train_valid_idxes = []
     train_valid_labels_idxes = []
