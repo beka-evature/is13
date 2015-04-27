@@ -61,8 +61,8 @@ CONF = {
     'nhidden': 200, # number of hidden units
     'seed': 345,
     'emb_dimension': 10, # dimension of character embedding
-    'nepochs': 1000,
-    'number_of_files': None, # All of them. Limit the scope To speed things up...
+    'nepochs': 100,
+    'number_of_files':  5000, # None = All of them. Limit the scope To speed things up...
     'error_probability': 0.1
     }
 
@@ -128,7 +128,7 @@ def play_with_spelling():
     best_f1 = -np.inf
     CONF['current_learning_rate'] = CONF['learning_rate']
     print "Start training"
-    start_time = time.time()
+    start_time = print_time = time.time()
     for epoch in xrange(CONF['nepochs']):
         # shuffle
         shuffle([words_lex, train_y], CONF['seed'])
@@ -137,25 +137,30 @@ def play_with_spelling():
         percentage_of_sentences_to_train = (epoch + 1) / CONF['nepochs']
         numer_of_sentences_to_train = int(nsentences * percentage_of_sentences_to_train)
         print "starting an epoch, numer_of_sentences_to_train =", numer_of_sentences_to_train
-        for i in xrange(numer_of_sentences_to_train):
-            words = words_lex[i]
-            labels = train_y[i]
-            for word_batch, label_last_word in zip(words, labels):
-                rnn.train(word_batch, label_last_word, CONF['current_learning_rate'])
-                rnn.normalize()
-            if CONF['verbose']:
-                print '[learning] epoch %i >> %2.2f%%' % (epoch, (i + 1) * 100. / numer_of_sentences_to_train), 'completed in %.2f (sec) <<\r' % (time.time() - tic),
+        test_size = int(len(windowed_test_lex) * percentage_of_sentences_to_train)
+        print "test_size", test_size
+        validation_size = int(len(windowed_valid_lex) * percentage_of_sentences_to_train)
+        print "validation_size", validation_size
+        for _ in xrange(30): # Trauma!
+            print "_", _
+            for i in xrange(numer_of_sentences_to_train):
+                words = words_lex[i]
+                labels = train_y[i]
+                for word_batch, label_last_word in zip(words, labels):
+                    rnn.train(word_batch, label_last_word, CONF['current_learning_rate'])
+                    rnn.normalize()
+                if CONF['verbose'] and time.time() - print_time > 30:
+                    print '[learning] epoch %i >> %2.2f%%' % (epoch, (i + 1) * 100. / numer_of_sentences_to_train), 'completed in %.2f (sec) <<\r' % (time.time() - tic),
+                    print_time = time.time()            
 
         # evaluation // back into the real world : idx -> words
         if CONF['verbose']:
             print "Classify test"
-        test_size = int(len(windowed_test_lex) * percentage_of_sentences_to_train)
         predictions_test = [[idx2label[x] for x in rnn.classify(windowed_test_lex_item)]
                             for windowed_test_lex_item in windowed_test_lex[:test_size]]
 
         if CONF['verbose']:
             print "Classify validation"
-        validation_size = int(len(windowed_valid_lex) * percentage_of_sentences_to_train)
         predictions_valid = [[idx2label[x] for x in rnn.classify(windowed_valid_lex_item)]
                              for windowed_valid_lex_item in windowed_valid_lex[:validation_size]]
         # evaluation // compute the accuracy using conlleval.pl
@@ -221,6 +226,7 @@ def create_test(sentence, probability):
                 err_char = err_char.upper()
             w_errors += err_char
     return w_errors
+
 
 
 if __name__ == '__main__':
